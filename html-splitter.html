@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HTML Splitter — NiiCk Studio</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root {
+  --bg: #0e0e10;
+  --surface: #16161a;
+  --surface2: #1e1e24;
+  --border: #2a2a32;
+  --border2: #3a3a46;
+  --text: #e8e8f0;
+  --muted: #7a7a90;
+  --accent: #7c6cf8;
+  --accent2: #a89dff;
+  --green: #4ade80;
+  --amber: #fbbf24;
+  --red: #f87171;
+  --teal: #2dd4bf;
+  --blue: #60a5fa;
+  --mono: 'JetBrains Mono','Fira Code',monospace;
+  --sans: 'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;display:flex;flex-direction:column}
+
+header{border-bottom:1px solid var(--border);padding:13px 20px;display:flex;align-items:center;gap:10px;background:var(--surface);flex-shrink:0}
+.logo{width:26px;height:26px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;font-weight:700;color:#fff}
+header h1{font-size:13px;font-weight:500;letter-spacing:.02em}
+header small{font-size:10px;color:var(--muted);font-family:var(--mono);margin-left:2px}
+.badge{margin-left:auto;font-size:10px;font-family:var(--mono);color:var(--accent2);background:rgba(124,108,248,.12);border:1px solid rgba(124,108,248,.25);padding:3px 8px;border-radius:4px}
+
+/* STEPS */
+.app{flex:1;overflow:hidden;display:flex;flex-direction:column}
+
+/* STEP INDICATOR */
+.steps-bar{display:flex;align-items:center;padding:14px 20px;gap:8px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
+.step-dot{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:10px;font-family:var(--mono);color:var(--muted);transition:all .2s;flex-shrink:0}
+.step-dot.active{border-color:var(--accent);color:var(--accent2);background:rgba(124,108,248,.1)}
+.step-dot.done{border-color:var(--green);color:var(--green);background:rgba(74,222,128,.08)}
+.step-label{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.step-label.active{color:var(--text)}
+.step-sep{flex:1;height:1px;background:var(--border);max-width:40px}
+
+/* PAGES */
+.page{display:none;flex:1;overflow-y:auto;padding:24px 20px;flex-direction:column;gap:20px}
+.page.active{display:flex}
+
+/* DROP ZONE */
+.dropzone{border:1.5px dashed var(--border2);border-radius:12px;padding:40px 20px;text-align:center;cursor:pointer;transition:all .2s;position:relative;background:var(--surface2)}
+.dropzone:hover,.dropzone.drag-over{border-color:var(--accent);background:rgba(124,108,248,.06)}
+.dropzone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+.dropzone-icon{font-size:36px;margin-bottom:12px}
+.dropzone p{font-size:13px;color:var(--muted);line-height:1.7}
+.dropzone p strong{color:var(--accent2);font-weight:500}
+
+/* MODE CARDS */
+.mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mode-card{border:1.5px solid var(--border2);border-radius:12px;padding:20px 16px;cursor:pointer;transition:all .2s;background:var(--surface2);display:flex;flex-direction:column;gap:10px}
+.mode-card:hover{border-color:var(--accent);background:rgba(124,108,248,.06)}
+.mode-card.selected{border-color:var(--accent);background:rgba(124,108,248,.1)}
+.mode-icon{font-size:28px}
+.mode-title{font-size:13px;font-weight:500;color:var(--text)}
+.mode-desc{font-size:11px;color:var(--muted);line-height:1.6;font-family:var(--mono)}
+.mode-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.mode-tag{font-size:10px;font-family:var(--mono);padding:2px 6px;border-radius:3px;background:rgba(255,255,255,.06);color:var(--muted);border:1px solid var(--border2)}
+
+/* OUTPUT */
+.output-area{display:flex;flex-direction:column;gap:10px}
+.file-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.file-card-header{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer}
+.file-card-header:hover{background:rgba(255,255,255,.03)}
+.file-chip{font-size:10px;font-family:var(--mono);padding:2px 7px;border-radius:4px;font-weight:600}
+.chip-html{background:rgba(168,157,255,.15);color:var(--accent2);border:1px solid rgba(168,157,255,.3)}
+.chip-css{background:rgba(96,165,250,.15);color:var(--blue);border:1px solid rgba(96,165,250,.3)}
+.chip-js{background:rgba(251,191,36,.15);color:var(--amber);border:1px solid rgba(251,191,36,.3)}
+.chip-json{background:rgba(251,191,36,.1);color:var(--amber);border:1px solid rgba(251,191,36,.2)}
+.file-name{font-size:12px;font-family:var(--mono);color:var(--text);flex:1}
+.file-size{font-size:10px;color:var(--muted);font-family:var(--mono)}
+.file-actions{display:flex;gap:6px;margin-left:4px}
+.btn-sm{padding:5px 10px;border-radius:6px;font-size:11px;font-family:var(--mono);cursor:pointer;border:none;transition:all .15s;font-weight:500}
+.btn-copy{background:rgba(74,222,128,.1);color:var(--green);border:1px solid rgba(74,222,128,.25)}
+.btn-copy:hover{background:rgba(74,222,128,.2)}
+.btn-copy.copied{background:rgba(74,222,128,.25);color:var(--green)}
+.btn-dl{background:rgba(124,108,248,.1);color:var(--accent2);border:1px solid rgba(124,108,248,.25)}
+.btn-dl:hover{background:rgba(124,108,248,.2)}
+.file-preview{display:none;padding:12px 14px}
+.file-preview.open{display:block}
+.file-preview pre{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto}
+
+/* SECTION TAG PICKERS */
+.tag-group{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.tag{font-size:11px;font-family:var(--mono);padding:4px 10px;border-radius:5px;cursor:pointer;border:1px solid var(--border2);color:var(--muted);background:var(--surface2);transition:all .15s}
+.tag.active{border-color:var(--accent);color:var(--accent2);background:rgba(124,108,248,.1)}
+
+/* SECTION LABEL */
+.sec-label{font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+
+/* STATS */
+.stats-row{display:flex;gap:12px;flex-wrap:wrap}
+.stat-pill{font-size:11px;font-family:var(--mono);padding:4px 10px;border-radius:5px;display:flex;align-items:center;gap:5px}
+.stat-pill.green{background:rgba(74,222,128,.08);color:var(--green);border:1px solid rgba(74,222,128,.2)}
+.stat-pill.amber{background:rgba(251,191,36,.08);color:var(--amber);border:1px solid rgba(251,191,36,.2)}
+.stat-pill.teal{background:rgba(45,212,191,.08);color:var(--teal);border:1px solid rgba(45,212,191,.2)}
+
+/* FOOTER */
+footer{border-top:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;gap:10px;background:var(--surface);flex-shrink:0}
+.btn{padding:9px 16px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;font-family:var(--sans)}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent2)}
+.btn-primary:disabled{opacity:.3;cursor:not-allowed}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border2)}
+.btn-ghost:hover{color:var(--text);border-color:var(--muted)}
+.footer-hint{font-size:11px;color:var(--muted);font-family:var(--mono);margin-left:auto}
+
+/* FILE LOADED */
+.file-loaded-bar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(74,222,128,.06);border:1px solid rgba(74,222,128,.2);border-radius:8px;font-size:12px;color:var(--green);font-family:var(--mono)}
+
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+@media(max-width:600px){
+  .mode-grid{grid-template-columns:1fr}
+  .mode-card{flex-direction:row;align-items:flex-start}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">&lt;/&gt;</div>
+  <h1>HTML Splitter <small>v2</small></h1>
+  <div class="badge">NiiCk Studio</div>
+</header>
+
+<div class="app">
+  <!-- STEP BAR -->
+  <div class="steps-bar">
+    <div class="step-dot active" id="sd1">1</div>
+    <span class="step-label active" id="sl1">File ရွေး</span>
+    <div class="step-sep"></div>
+    <div class="step-dot" id="sd2">2</div>
+    <span class="step-label" id="sl2">Mode ရွေး</span>
+    <div class="step-sep"></div>
+    <div class="step-dot" id="sd3">3</div>
+    <span class="step-label" id="sl3">Output</span>
+  </div>
+
+  <!-- PAGE 1: DROP FILE -->
+  <div class="page active" id="page1">
+    <div class="sec-label">Step 1 — HTML File ရွေးချယ်ရန်</div>
+    <div class="dropzone" id="dropzone">
+      <input type="file" id="fileInput" accept=".html,.htm">
+      <div class="dropzone-icon">📄</div>
+      <p><strong>HTML file drop လုပ်ပါ</strong><br>ဒါမှမဟုတ် tap ပြီး browse လုပ်ပါ</p>
+    </div>
+    <div class="file-loaded-bar" id="fileLoadedBar" style="display:none">
+      <span>✓</span><span id="fileLoadedName">—</span>
+    </div>
+  </div>
+
+  <!-- PAGE 2: MODE SELECT -->
+  <div class="page" id="page2">
+    <div class="sec-label">Step 2 — ဘာလုပ်မှာလဲ?</div>
+    <div class="mode-grid">
+      <div class="mode-card" id="modeA" onclick="selectMode('A')">
+        <div class="mode-icon">✂️</div>
+        <div class="mode-title">HTML / CSS / JS ခွဲမယ်</div>
+        <div class="mode-desc">style, script tags တွေကို သပ်သပ် ဖိုင်တွေပိုင်းထုတ်မယ်</div>
+        <div class="mode-tags">
+          <span class="mode-tag">styles.css</span>
+          <span class="mode-tag">script.js</span>
+          <span class="mode-tag">index.html</span>
+        </div>
+      </div>
+      <div class="mode-card" id="modeB" onclick="selectMode('B')">
+        <div class="mode-icon">🧩</div>
+        <div class="mode-title">Sections ခွဲမယ်</div>
+        <div class="mode-desc">HTML ကို semantic element တွေအလိုက် component ဖိုင်တွေ ပိုင်းမယ်</div>
+        <div class="mode-tags">
+          <span class="mode-tag">hero.html</span>
+          <span class="mode-tag">footer.html</span>
+          <span class="mode-tag">nav.html</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mode B extras -->
+    <div id="modeBExtras" style="display:none">
+      <div class="sec-label">ခွဲမည့် Tags ရွေးချယ်ပါ</div>
+      <div class="tag-group" id="tagGroup">
+        <div class="tag active" data-tag="section">section</div>
+        <div class="tag active" data-tag="header">header</div>
+        <div class="tag active" data-tag="footer">footer</div>
+        <div class="tag" data-tag="nav">nav</div>
+        <div class="tag" data-tag="article">article</div>
+        <div class="tag" data-tag="aside">aside</div>
+        <div class="tag" data-tag="main">main</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE 3: OUTPUT -->
+  <div class="page" id="page3">
+    <div class="stats-row" id="statsRow"></div>
+    <div class="output-area" id="outputArea"></div>
+  </div>
+</div>
+
+<footer>
+  <button class="btn btn-ghost" id="backBtn" onclick="goBack()" style="display:none">← Back</button>
+  <button class="btn btn-primary" id="nextBtn" onclick="goNext()" disabled>Next →</button>
+  <button class="btn btn-ghost" id="dlZipBtn" onclick="downloadZip()" style="display:none">⬇ Download ZIP</button>
+  <button class="btn btn-ghost" id="resetBtn" onclick="resetAll()" style="display:none">Reset</button>
+  <div class="footer-hint" id="footerHint">HTML file တစ်ခု ရွေးချယ်ပါ</div>
+</footer>
+
+<script>
+let currentPage = 1;
+let selectedMode = null;
+let activeTags = ['section','header','footer'];
+let rawHTML = '';
+let currentFileName = '';
+let parsedFiles = {};
+
+// DROPZONE
+const dropzone = document.getElementById('dropzone');
+dropzone.addEventListener('dragover', e=>{e.preventDefault();dropzone.classList.add('drag-over')});
+dropzone.addEventListener('dragleave', ()=>dropzone.classList.remove('drag-over'));
+dropzone.addEventListener('drop', e=>{e.preventDefault();dropzone.classList.remove('drag-over');const f=e.dataTransfer.files[0];if(f)loadFile(f)});
+document.getElementById('fileInput').addEventListener('change', e=>{if(e.target.files[0])loadFile(e.target.files[0])});
+
+function loadFile(file) {
+  currentFileName = file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    rawHTML = e.target.result;
+    document.getElementById('fileLoadedBar').style.display = 'flex';
+    document.getElementById('fileLoadedName').textContent = file.name + ' (' + (rawHTML.length/1024).toFixed(1) + ' KB)';
+    document.getElementById('nextBtn').disabled = false;
+    document.getElementById('footerHint').textContent = file.name;
+  };
+  reader.readAsText(file);
+}
+
+// TAG TOGGLES
+document.querySelectorAll('.tag').forEach(tag=>{
+  tag.addEventListener('click', ()=>{
+    const t = tag.dataset.tag;
+    tag.classList.toggle('active');
+    activeTags = tag.classList.contains('active') ? [...activeTags, t] : activeTags.filter(x=>x!==t);
+  });
+});
+
+function selectMode(m) {
+  selectedMode = m;
+  document.getElementById('modeA').classList.toggle('selected', m==='A');
+  document.getElementById('modeB').classList.toggle('selected', m==='B');
+  document.getElementById('modeBExtras').style.display = m==='B' ? 'block' : 'none';
+  document.getElementById('nextBtn').disabled = false;
+}
+
+function setStep(n) {
+  [1,2,3].forEach(i=>{
+    const d = document.getElementById('sd'+i);
+    const l = document.getElementById('sl'+i);
+    d.className = 'step-dot' + (i===n?' active':i<n?' done':'');
+    l.className = 'step-label' + (i===n?' active':'');
+    if(i<n) d.textContent = '✓';
+    else d.textContent = i;
+  });
+}
+
+function goNext() {
+  if(currentPage===1) {
+    if(!rawHTML) return;
+    showPage(2);
+    document.getElementById('nextBtn').disabled = !selectedMode;
+    document.getElementById('nextBtn').textContent = 'Split →';
+    document.getElementById('backBtn').style.display = 'flex';
+    document.getElementById('footerHint').textContent = 'Mode ရွေးပါ';
+  } else if(currentPage===2) {
+    if(!selectedMode) return;
+    processAndShow();
+    showPage(3);
+    document.getElementById('nextBtn').style.display = 'none';
+    document.getElementById('dlZipBtn').style.display = 'flex';
+    document.getElementById('resetBtn').style.display = 'flex';
+    document.getElementById('footerHint').textContent = 'Files ready';
+  }
+}
+
+function goBack() {
+  if(currentPage===2) {
+    showPage(1);
+    document.getElementById('nextBtn').textContent = 'Next →';
+    document.getElementById('nextBtn').disabled = !rawHTML;
+    document.getElementById('backBtn').style.display = 'none';
+    document.getElementById('footerHint').textContent = currentFileName || 'HTML file တစ်ခု ရွေးချယ်ပါ';
+  } else if(currentPage===3) {
+    showPage(2);
+    document.getElementById('nextBtn').style.display = 'flex';
+    document.getElementById('dlZipBtn').style.display = 'none';
+    document.getElementById('resetBtn').style.display = 'none';
+  }
+}
+
+function showPage(n) {
+  currentPage = n;
+  [1,2,3].forEach(i=>{
+    document.getElementById('page'+i).classList.toggle('active', i===n);
+  });
+  setStep(n);
+}
+
+function resetAll() {
+  currentPage=1; selectedMode=null; rawHTML=''; currentFileName=''; parsedFiles={};
+  activeTags=['section','header','footer'];
+  document.getElementById('fileLoadedBar').style.display='none';
+  document.getElementById('fileInput').value='';
+  document.querySelectorAll('.tag').forEach(t=>{t.classList.toggle('active',['section','header','footer'].includes(t.dataset.tag))});
+  document.getElementById('modeA').classList.remove('selected');
+  document.getElementById('modeB').classList.remove('selected');
+  document.getElementById('modeBExtras').style.display='none';
+  document.getElementById('nextBtn').textContent='Next →';
+  document.getElementById('nextBtn').disabled=true;
+  document.getElementById('nextBtn').style.display='flex';
+  document.getElementById('backBtn').style.display='none';
+  document.getElementById('dlZipBtn').style.display='none';
+  document.getElementById('resetBtn').style.display='none';
+  document.getElementById('footerHint').textContent='HTML file တစ်ခု ရွေးချယ်ပါ';
+  showPage(1);
+}
+
+// ─── PARSERS ───────────────────────────────────────────
+
+function processAndShow() {
+  parsedFiles = {};
+  if(selectedMode==='A') splitFilesMode();
+  else splitSectionsMode();
+  renderOutput();
+}
+
+function splitFilesMode() {
+  const doc = (new DOMParser()).parseFromString(rawHTML, 'text/html');
+  let css = '', js = '';
+
+  doc.querySelectorAll('style').forEach((s,i)=>{
+    css += `/* === style block ${i+1} === */\n` + s.textContent.trim() + '\n\n';
+    s.remove();
+  });
+
+  doc.querySelectorAll('script:not([type]), script[type="text/javascript"]').forEach((s,i)=>{
+    if(s.src) return;
+    js += `/* === script block ${i+1} === */\n` + s.textContent.trim() + '\n\n';
+    s.remove();
+  });
+
+  if(css.trim()) {
+    const link = doc.createElement('link');
+    link.rel='stylesheet'; link.href='styles.css';
+    doc.head.appendChild(link);
+    parsedFiles['styles.css'] = css.trim();
+  }
+  if(js.trim()) {
+    const scr = doc.createElement('script');
+    scr.src = 'script.js';
+    doc.body.appendChild(scr);
+    parsedFiles['script.js'] = js.trim();
+  }
+
+  parsedFiles['index.html'] = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+}
+
+function splitSectionsMode() {
+  const doc = (new DOMParser()).parseFromString(rawHTML, 'text/html');
+  let css = '';
+
+  doc.querySelectorAll('style').forEach((s,i)=>{
+    css += `/* === style ${i+1} === */\n` + s.textContent.trim() + '\n\n';
+    s.remove();
+  });
+  if(css.trim()) {
+    const link = doc.createElement('link');
+    link.rel='stylesheet'; link.href='css/styles.css';
+    doc.head.appendChild(link);
+    parsedFiles['css/styles.css'] = css.trim();
+  }
+
+  activeTags.forEach(tag=>{
+    Array.from(doc.body.children).filter(el=>el.tagName.toLowerCase()===tag).forEach((el,i)=>{
+      const id = el.id || (el.className.toString().split(' ')[0]) || `${tag}-${i+1}`;
+      const fname = `components/${id}.html`;
+      const tmp = document.createElement('div');
+      tmp.appendChild(el.cloneNode(true));
+      parsedFiles[fname] = tmp.innerHTML.trim();
+      const comment = doc.createComment(` #include ${fname} `);
+      el.replaceWith(comment);
+    });
+  });
+
+  parsedFiles['index.html'] = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+}
+
+// ─── RENDER OUTPUT ─────────────────────────────────────
+
+function getType(name) {
+  if(name.endsWith('.html')) return 'html';
+  if(name.endsWith('.css')) return 'css';
+  if(name.endsWith('.js')) return 'js';
+  if(name.endsWith('.json')) return 'json';
+  return 'other';
+}
+
+function renderOutput() {
+  const keys = Object.keys(parsedFiles);
+  const totalSize = keys.reduce((a,k)=>a+parsedFiles[k].length,0);
+
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat-pill green">✓ ${keys.length} files</div>
+    <div class="stat-pill amber">⚡ ${(totalSize/1024).toFixed(1)} KB total</div>
+    <div class="stat-pill teal">📦 Ready to use</div>
+  `;
+
+  const area = document.getElementById('outputArea');
+  area.innerHTML = '';
+
+  keys.forEach(path=>{
+    const content = parsedFiles[path];
+    const name = path.split('/').pop();
+    const type = getType(name);
+    const preview = content.slice(0,800) + (content.length>800?'\n...(truncated)':'');
+
+    const card = document.createElement('div');
+    card.className = 'file-card';
+    card.innerHTML = `
+      <div class="file-card-header" onclick="togglePreview(this)">
+        <span class="file-chip chip-${type}">${type.toUpperCase()}</span>
+        <span class="file-name">${path}</span>
+        <span class="file-size">${(content.length/1024).toFixed(1)}KB</span>
+        <div class="file-actions" onclick="event.stopPropagation()">
+          <button class="btn-sm btn-copy" onclick="copyFile('${path}', this)">Copy</button>
+          <button class="btn-sm btn-dl" onclick="downloadFile('${path}')">⬇</button>
+        </div>
+      </div>
+      <div class="file-preview">
+        <pre>${escapeHTML(preview)}</pre>
+      </div>
+    `;
+    area.appendChild(card);
+  });
+}
+
+function togglePreview(header) {
+  const prev = header.nextElementSibling;
+  prev.classList.toggle('open');
+}
+
+function escapeHTML(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function copyFile(path, btn) {
+  const content = parsedFiles[path];
+  navigator.clipboard.writeText(content).then(()=>{
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copied!';
+    btn.classList.add('copied');
+    setTimeout(()=>{btn.textContent=orig;btn.classList.remove('copied')},2000);
+  }).catch(()=>{
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = content;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    btn.textContent = '✓ Copied!';
+    setTimeout(()=>btn.textContent='Copy',2000);
+  });
+}
+
+function downloadFile(path) {
+  const blob = new Blob([parsedFiles[path]], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = path.split('/').pop();
+  a.click();
+}
+
+async function downloadZip() {
+  const zip = new JSZip();
+  const base = currentFileName.replace(/\.html?$/i,'') || 'project';
+  const folder = zip.folder(base);
+  Object.entries(parsedFiles).forEach(([p,c])=>folder.file(p,c));
+  const blob = await zip.generateAsync({type:'blob'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = base + '-split.zip';
+  a.click();
+}
+</script>
+</body>
+</html>
